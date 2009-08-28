@@ -4,7 +4,7 @@ from tagging import fields as tagging
 # Create your models here.
 class Quiz(models.Model):
     name = models.CharField(max_length=255)
-    slug = models.CharField(max_length=255)
+    slug = models.SlugField(max_length=255)
     description = models.TextField()
     tags = tagging.TagField()
 
@@ -47,25 +47,38 @@ class QuizModule(models.Model):
         return u"%s-%s" % (self.quiz, self.module)
 
 class Question(models.Model):
-    modules = models.ManyToManyField(Module)
     title = models.CharField(max_length=255, blank=True, null=True)
-    slug = models.CharField(max_length=255)
+    slug = models.SlugField(max_length=255, unique=True)
     content = models.TextField()
+    difficulty = models.PositiveIntegerField(
+        null=True, blank=True, help_text="on a scale of: 1-10")
+    point_value = models.IntegerField(default=1)
+    modules = models.ManyToManyField(Module)
 
     def correct(self, answer):
         raise NotImplementedError
 
-class MultipleChoiceQuestion(Question):
-    class Meta:
-        proxy = True
-
-    def correct(self, answer):
-        return self.possibleanswer_set.filter()
+#class MultipleChoiceQuestion(Question):
+#
+#    def correct(self, answer):
+#        return self.possibleanswer_set.filter()
+#
+#class ShortAnswerQuestion(Question):
+#
+#    def correct(self, answer):
+#        correct = self.possibleanswer_set.get()
 
 class PossibleAnswer(models.Model):
+
+    class Meta:
+        ordering = ("id", )
+
     question = models.ForeignKey(Question)
-    is_correct = models.BooleanField(help_text="This is a correct answer")
     content = models.CharField(max_length=255)
+    percent_correct = models.FloatField(default=0,
+        help_text="Percentage of this questions points that using this answer will reward (-1.0 = -100%; 1.0 = 100%)")
+    #explaination = models.TextField()
+
 
 class HelpNote(models.Model):
     question = models.ForeignKey(Question, blank=True, null=True)
