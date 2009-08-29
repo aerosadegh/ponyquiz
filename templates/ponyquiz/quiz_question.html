@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}{{ session.quiz }}{% endblock %}
+
+{% block extrahead %}
+{{ block.super }}
+<style type="text/css">
+    .answer-set {border-top: 1px solid; margin-bottom: 25px; }
+    .answer {font-size: 14pt; width: 19%; float: left;}
+    .answer input {margin-right: 10px; }
+    .hiragana {
+        margin: auto;
+        width: 100px;
+        font-size: 70pt;
+        border: 3px solid black;
+        margin-bottom: 25px;
+        text-align: center;
+    }
+    .question {
+        text-align: center;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="question">
+    <h2>{{ question.title }}</h2>
+    <h3>Question #{{ answered.count|add:1 }}</h3>
+    {{ question.content|safe }}
+</div>
+
+<form action="." method="post">
+    <input name="question" value="{{ response.id }}" type="hidden" />
+    <div class="answer-set">
+        {% for useranswer in response.userpossibleanswer_set.all %}
+        {% with useranswer.possibleanswer as answer %}
+        <div class="answer">
+            <input type="radio" name="answer" value="{{ answer.id }}" />{{ answer.content }}
+        </div>
+        {% endwith %}
+        {% endfor %}
+        <br clear="both" />
+    </div>
+    <input type="submit" value="Answer" />
+</form>
+{% endblock %}

@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}{{ quiz.name }}{% endblock %}
+
+{% block extrahead %}
+{{ block.super }}
+<style type="text/css">
+    .topscore {float: right;}
+</style>
+{% endblock %}
+
+{% block content %}
+<h2>{{ quiz.name }}</h2>
+<div class="topscore">
+    <h3>Top Scores</h3>
+    <ul>
+        {% for top in topscores %}<li><strong>{{ top.total_score }}</strong> {{ top.name }}</li>
+        {% endfor %}
+    </ul>
+    <div>{{ total_plays }} completed</div>
+</div>
+{{ quiz.description|safe }}
+
+<form action="." method="post">
+    <table>
+        {{ form }}
+        <tr>
+            <td></td>
+            <td><input type="submit" value="Start" /></td>
+        </tr>
+    </table>
+</form>
+{% endblock %}

@@ -21,8 +21,7 @@ class QuizSession_Inline(admin.TabularInline):
     model = QuizSession
 
 class QuestionOptions(admin.ModelAdmin):
-    inlines = [PossibleAnswer_Inline, HelpNote_Inline]
-    prepopulated_fields = { "slug": ("title",) }
+    inlines = [PossibleAnswer_Inline]#, HelpNote_Inline]
     tiny_mce_fields = ("content",)
 
 class QuizOptions(admin.ModelAdmin):

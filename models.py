@@ -1,5 +1,9 @@
 from django.db import models
 from tagging import fields as tagging
+from django.conf import settings
+import random
+
+MAX_CHOICES = getattr(settings, "QUIZ_MAX_CHOICES", 5)
 
 # Create your models here.
 class Quiz(models.Model):
@@ -27,7 +31,10 @@ class Module(models.Model):
         ordering = ["parent__id"]
 
     def __unicode__(self):
-        return self.name
+        if self.parent:
+            return "%s > %s" % (self.parent, self.name)
+        else:
+            return self.name
 
 class QuizModule(models.Model):
     quiz = models.ForeignKey(Quiz)
@@ -48,15 +55,44 @@ class QuizModule(models.Model):
 
 class Question(models.Model):
     title = models.CharField(max_length=255, blank=True, null=True)
-    slug = models.SlugField(max_length=255, unique=True)
     content = models.TextField()
     difficulty = models.PositiveIntegerField(
         null=True, blank=True, help_text="on a scale of: 1-10")
     point_value = models.IntegerField(default=1)
-    modules = models.ManyToManyField(Module)
+    module = models.ForeignKey(Module)
+
+    def __unicode__(self):
+        return "%s > %s" % (self.module, self.title or self.id)
+
+    def get_answers(self):
+
+        answers = self.possibleanswer_set.all()
+        if answers.count() > MAX_CHOICES:
+            retval = list(answers.filter(percent_correct__gt=0)[:MAX_CHOICES])
+            incorrect = list(answers.filter(percent_correct__lte=0))
+            remaining = MAX_CHOICES - len(retval)
+            if remaining > 0:
+                retval += random.sample(incorrect, remaining)
+        else:
+            retval = list(answers)
+        random.shuffle(retval)
+        return retval
 
     def correct(self, answer):
-        raise NotImplementedError
+        possible = self.possibleanswer_set.all()
+        count = possible.count()
+        if count == 0:
+            # opinion/grade later
+            return self.point_value, answer
+        elif count == 1:
+            # short answer
+            correct = list(possible)[0]
+            if answer == correct.content:
+                return self.point_value, answer
+        else:
+            # multiple guess
+            answer = possible.get(id=answer)
+            return answer.percent_correct * self.point_value, answer.content
 
 #class MultipleChoiceQuestion(Question):
 #
@@ -79,6 +115,16 @@ class PossibleAnswer(models.Model):
         help_text="Percentage of this questions points that using this answer will reward (-1.0 = -100%; 1.0 = 100%)")
     #explaination = models.TextField()
 
+    def __unicode__(self):
+        if self.percent_correct >= 1:
+            retval = "Correct Answer"
+        elif self.percent_correct > 0:
+            retval = "Partially Correct Answer"
+        elif self.percent_correct == 0:
+            retval = "Incorrect Answer"
+        else:
+            retval = "Wickedly Placed Incorrect Answer"
+        return "%s > %s" % (self.question, retval)
 
 class HelpNote(models.Model):
     question = models.ForeignKey(Question, blank=True, null=True)
@@ -99,16 +145,44 @@ class UserNoteVote(models.Model):
     note = models.TextField()
 
 class QuizSession(models.Model):
-    user = models.ForeignKey("auth.User")
+    user = models.ForeignKey("auth.User", blank=True, null=True)
+    ip_address = models.CharField(max_length=100, blank=True, null=True)
+    name = models.CharField(max_length=255)
+    quiz = models.ForeignKey(Quiz)
     started_on = models.DateTimeField(auto_now_add=True)
     ended_on = models.DateTimeField(editable=False, null=True)
-    total_score = models.IntegerField()
-    attempt = models.IntegerField()
+    total_score = models.IntegerField(null=True)
+    attempt = models.IntegerField(null=True)
+
+    def answered(self):
+        return self.useranswer_set.filter(answered_on__isnull=False).order_by("answered_on")
 
 class UserAnswer(models.Model):
-    user = models.ForeignKey("auth.User")
-    answer = models.CharField(max_length=256)
-    score = models.IntegerField()
+
+    class Meta:
+        ordering = ("id",)
+        
+    session = models.ForeignKey(QuizSession)
+    question = models.ForeignKey(Question)
+    answer = models.CharField(max_length=256, null=True)
+    score = models.IntegerField(null=True)
+    answered_on = models.DateTimeField(null=True)
+
+    def save(self):
+        created = False
+        if not self.id:
+            created = True
+        super(UserAnswer, self).save()
+        if created:
+            for possible in self.question.get_answers():
+                UserPossibleAnswer(useranswer=self, possibleanswer=possible).save()
+
+    def get_correct_answers(self):
+        return PossibleAnswer.objects.filter(userpossibleanswer__useranswer=self, percent_correct__gt=0).order_by("-percent_correct")
+
+class UserPossibleAnswer(models.Model):
+    useranswer = models.ForeignKey(UserAnswer)
+    possibleanswer = models.ForeignKey(PossibleAnswer)
 
 class UserLongAnswer(UserAnswer):
     content = models.TextField()
