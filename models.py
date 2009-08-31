@@ -47,11 +47,26 @@ class QuizModule(models.Model):
         "use this field to set how many questions users must answer or "
         "leave blank to use all questions.")
 
+    allow_notes = models.BooleanField(default=True,
+        help_text="Allow users to write their own notes")
+    must_answer = models.BooleanField(default=True,
+        help_text="Users must answer correctly before proceeding")
+
     class Meta:
         ordering = ["order"]
 
     def __unicode__(self):
         return u"%s-%s" % (self.quiz, self.module)
+
+    def get_questions(self):
+        questions = self.module.question_set.all()
+        if self.randomize and self.num_random_questions < questions.count():
+
+            retval = random.sample(questions, self.num_random_questions)
+        else:
+            retval = list(questions)
+        random.shuffle(retval)
+        return retval
 
 class Question(models.Model):
     title = models.CharField(max_length=255, blank=True, null=True)
@@ -165,8 +180,10 @@ class UserAnswer(models.Model):
     session = models.ForeignKey(QuizSession)
     question = models.ForeignKey(Question)
     answer = models.CharField(max_length=256, null=True)
+    previous_answers = models.TextField(null=True)
     score = models.IntegerField(null=True)
     answered_on = models.DateTimeField(null=True)
+    attempt = models.IntegerField(default=1)
 
     def save(self):
         created = False

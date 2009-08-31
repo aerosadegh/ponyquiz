@@ -1,3 +1,4 @@
+from django.http import HttpResponse
 import datetime
 from django import forms
 from django.core.urlresolvers import reverse
@@ -76,14 +77,20 @@ def quiz_intro(request, slug, template_name="ponyquiz/quiz_start.html"):
                 user=request.user, quiz=quiz).count() + 1
             session.save()
 
-            # register all questions to it
-            for question in Question.objects.filter(module__quizmodule__quiz=quiz):
-                ua = UserAnswer()
-                ua.session = session
-                ua.question = question
-                ua.save()
+            first = None
 
-            return HttpResponseRedirect(reverse("quiz-question", args=[session.id]))
+            # register all questions to it
+            for quizmodule in quiz.quizmodule_set.all():
+
+                for question in quizmodule.get_questions():
+                    ua = UserAnswer()
+                    ua.session = session
+                    ua.question = question
+                    ua.save()
+                    if not first:
+                        first = ua
+
+            return HttpResponseRedirect(reverse("quiz-question", args=[first.id]))
     else:
         form = NameForm()
 
@@ -108,30 +115,80 @@ def quiz_end(request, id, template_name="ponyquiz/quiz_end.html"):
 
 def quiz_question(request, id, template_name="ponyquiz/quiz_question.html"):
 
-    session = QuizSession.objects.get(id=id)
+    # preload all the goodness
+    response = UserAnswer.objects.filter(session__user=request.user).select_related().get(id=id)
+    session = response.session
+
+    # get the next and previous questions
     responses = session.useranswer_set.all()
+    for idx, item in enumerate(responses.all()):
+        if item.id == response.id:
+            break            
+    if idx > 0:
+        previous = responses[idx-1]
+    if idx+1 < responses.count():
+        next = responses[idx+1]
+
     unanswered = responses.filter(answered_on__isnull=True)
-    answered = responses.filter(answered_on__isnull=False)
-
-    # TODO: make 15 configurable
-    if unanswered.count() > 0 and answered.count() < 15:
-        # next question
-        if request.REQUEST.get("question", False):
-            response = responses.get(id=request.REQUEST.get("question"))
-        else:
-            # randomize questions
-            response = random.choice(list(unanswered))
-        question = response.question
-
-        if request.method == "POST":
-            answer = request.POST.get("answer")
-            response.score,answer = question.correct(answer)
-            response.answered_on = datetime.datetime.now()
-            response.answer = answer
-            response.save()
-            return HttpResponseRedirect(reverse("quiz-question", args=[id]))
+    if unanswered.exclude(id=response.id).count() > 0:
+        next_unanswered = unanswered.exclude(id=response.id)[0]
     else:
-        return HttpResponseRedirect(reverse("quiz-end", args=[id]))
+        next_unanswered = None
+    answered = responses.filter(answered_on__isnull=False)
+    previous_answers = ("%s" % response.previous_answers).split(",")
+    question = response.question
+    
+    quiz_module = QuizModule.objects.get(module__question=question)
+    message = ""
+    
+    if request.method == "POST" and request.POST.get('answer', False):
+        
+        if not response.answered_on:
+            answer = request.POST.get("answer")
+            score,answer = question.correct(answer)
+            response.answer = answer
+
+            # if the module requires a correct answer,
+            # then don't set it as answered
+            if quiz_module.must_answer and score > 0:
+                response.answered_on = datetime.datetime.now()
+                if response.attempt == 1:
+                    response.score = score
+                    message = "Correct!"
+                else:
+                    response.score = 0
+                    message = "Correct, but sorry, no points"
+            else:
+                message = "Sorry, that's incorrect"
+                response.attempt += 1
+                if response.previous_answers:
+                    response.previous_answers += ",%s" % answer
+                else:
+                    response.previous_answers = answer
+
+            response.save()
+
+        if not next_unanswered:
+            return HttpResponseRedirect(reverse("quiz-end", args=[session.id]))
+#        else:
+#            return HttpResponseRedirect(reverse("quiz-question", args=[next_unanswered.id]))
     
     return render_to_response(template_name, locals(),
         context_instance=RequestContext(request))
+
+def add_usernote(request):
+
+    class UserNoteForm(forms.ModelForm):
+        class Meta:
+            model = UserNote
+            exclude = ["user"]
+
+
+    form = UserNoteForm(request.REQUEST)
+    if form.is_valid():
+        obj = form.save(commit=False)
+        obj.user = request.user
+        obj.save()
+        return HttpResponse("Saved")
+
+    return HttpResponse(unicode(form.errors))

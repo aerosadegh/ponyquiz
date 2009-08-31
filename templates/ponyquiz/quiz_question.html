@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load quiz_tags compare %}
 
 {% block title %}{{ session.quiz }}{% endblock %}
 
@@ -17,30 +18,79 @@
         text-align: center;
     }
     .question {
+        width: 675px;
         text-align: center;
+    }
+    .answer.current-answer { font-weight: bold; }
+    .answer.attempted { text-decoration: line-through; }
+    .message { font-weight: bold; text-align: center; font-size: 16pt; }
+    #sidebar {
+        padding-left: 5px;
+        border-left: 1px solid;
+        margin-left: 5px;
+        width: 300px;
+        float: right;
     }
 </style>
 {% endblock %}
 
 {% block content %}
+<div id="sidebar">
+    {% if help_notes %}
+    <h3>Help Notes</h3>
+    <div class="help-notes">
+        {{ help_notes }}
+    </div>
+    {% endif %}
+    <div class="user-notes">
+
+        {% if response.answered_on or response.attempt|gt:1 %}
+            {% with question|user_notes as notes %}{% if notes %}
+            <h3>User Contributed Hints</h3>
+            <ul>
+                {% for note in notes %}
+                <li>{{ note.content }} ~ {{ note.user.username }}
+                {{ note.created_on|date:"m/d/y" }}</li>
+                {% endfor %}
+            </ul>
+            {% endif %}{% endwith %}
+        {% endif %}
+        {% if response.score|gt:0 and user.is_authenticated %}
+        <h3 onclick="$('#user-note-form').toggle('slow')">Contribute Hint</h3>
+        <div id="user-note-form">
+            {% user_notes_form question %}
+        </div>
+        {% endif %}
+    </div>
+</div>
 <div class="question">
     <h2>{{ question.title }}</h2>
-    <h3>Question #{{ answered.count|add:1 }}</h3>
+    <h3>Question #{{ idx|add:1 }}:{% if response.answered_on %} Answered {% else %} Attempt {{ response.attempt }}{% endif %}</h3>
     {{ question.content|safe }}
-</div>
 
-<form action="." method="post">
-    <input name="question" value="{{ response.id }}" type="hidden" />
-    <div class="answer-set">
-        {% for useranswer in response.userpossibleanswer_set.all %}
-        {% with useranswer.possibleanswer as answer %}
-        <div class="answer">
-            <input type="radio" name="answer" value="{{ answer.id }}" />{{ answer.content }}
+    <form action="." method="post">
+        <input name="question" value="{{ response.id }}" type="hidden" />
+        <div class="answer-set">
+            {% for useranswer in response.userpossibleanswer_set.all %}
+            {% with useranswer.possibleanswer as answer %}
+            <div class="answer{% ifequal answer.content response.answer %} current-answer{% endifequal %}{% if answer.content|in:previous_answers %} attempted{% endif %}">
+                <input type="radio" name="answer" value="{{ answer.id }}" {% ifequal answer.content response.answer %}checked="checked"{% endifequal %} />{{ answer.content }}
+            </div>
+            {% endwith %}
+            {% endfor %}
+            <br clear="both" />
         </div>
-        {% endwith %}
-        {% endfor %}
-        <br clear="both" />
-    </div>
-    <input type="submit" value="Answer" />
-</form>
+        {% if message %}<div class="message">{{ message }}</div>{% endif %}
+        {% if previous %}
+        <a href="{% url quiz-question previous.id %}">&lt;&lt; Previous Question</a>
+        {% endif %}
+        <input type="submit" value="Answer" />
+        {% if next %}
+        <a href="{% url quiz-question next.id %}">Next Question &gt;&gt;</a>
+        {% endif %}<br />
+        {% if next_unanswered %}
+        <a href="{% url quiz-question next_unanswered.id %}">Next Unanswered Question &gt;&gt;</a>
+        {% endif %}
+    </form>
+</div>
 {% endblock %}

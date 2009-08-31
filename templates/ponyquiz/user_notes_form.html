@@ -1,0 +1,26 @@
+<form id="user-note-add" action="{% url quiz-user-note %}" method="post">
+    <table>
+        <tr>
+            <td colspan="2"><textarea name="content"></textarea></td>
+        </tr>
+        <tr>
+            <td>Private Note?:</td>
+            <td><input type="checkbox" name="private" /></td>
+        </tr>
+        <tr>
+            <td></td>
+            <td>
+                <input type="hidden" name="question" value="{{ question.id }}" />
+                <input type="submit" value="Save" />
+            </td>
+        </tr>
+    </table>
+</form>
+<script type="text/javascript">
+    $("#user-note-add").submit(function() {
+        $.get($(this).attr("action"), $(this).serialize())
+        $(this).before("<div class='message'>Thank you for contributing</div>")
+        $(this).hide()
+        return false
+    })
+</script>
