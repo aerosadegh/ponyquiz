@@ -14,14 +14,11 @@ class PossibleAnswer_Inline(admin.TabularInline):
     model = PossibleAnswer
     extra = 5
 
-class HelpNote_Inline(admin.TabularInline):
-    model = HelpNote
-
 class QuizSession_Inline(admin.TabularInline):
     model = QuizSession
 
 class QuestionOptions(admin.ModelAdmin):
-    inlines = [PossibleAnswer_Inline]#, HelpNote_Inline]
+    inlines = [PossibleAnswer_Inline]
     tiny_mce_fields = ("content",)
 
 class QuizOptions(admin.ModelAdmin):

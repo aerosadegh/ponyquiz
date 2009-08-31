@@ -101,12 +101,12 @@ def quiz_end(request, id, template_name="ponyquiz/quiz_end.html"):
     session = QuizSession.objects.get(id=id)
     if not session.ended_on:
         session.ended_on = datetime.datetime.now()
-        session.total_score = session.useranswer_set.aggregate(score=Sum("score"))["score"]
+        session.total_score = session.useranswer_set.aggregate(score=Sum("score"))["score"] or 0
         session.save()
 
     # show congrats/apologize
     topscores = QuizSession.objects.order_by("-total_score")[:10]
-    rank = QuizSession.objects.filter(total_score__gt=session.total_score).count() + 1
+    rank = QuizSession.objects.filter(total_score__gt=session.total_score or 0).count() + 1
     total_plays = QuizSession.objects.count()
     
 
@@ -135,9 +135,8 @@ def quiz_question(request, id, template_name="ponyquiz/quiz_question.html"):
     else:
         next_unanswered = None
     answered = responses.filter(answered_on__isnull=False)
-    previous_answers = ("%s" % response.previous_answers).split(",")
     question = response.question
-    
+    previous_answers = UserPossibleAnswer.objects.filter(possibleanswer__question=question, chosen=True)
     quiz_module = QuizModule.objects.get(module__question=question)
     message = ""
     
@@ -145,33 +144,37 @@ def quiz_question(request, id, template_name="ponyquiz/quiz_question.html"):
         
         if not response.answered_on:
             answer = request.POST.get("answer")
-            score,answer = question.correct(answer)
-            response.answer = answer
+
+            # save the user's answer
+            answered = UserPossibleAnswer.objects.get(id=answer)
+            answered.chosen = True
+            answered.save()
+
+            score = answered.point_value
+            response.answer = answered.possibleanswer.content
 
             # if the module requires a correct answer,
             # then don't set it as answered
-            if quiz_module.must_answer and score > 0:
+            if score > 0:
                 response.answered_on = datetime.datetime.now()
                 if response.attempt == 1:
                     response.score = score
-                    message = "Correct!"
                 else:
                     response.score = 0
-                    message = "Correct, but sorry, no points"
             else:
-                message = "Sorry, that's incorrect"
-                response.attempt += 1
-                if response.previous_answers:
-                    response.previous_answers += ",%s" % answer
+                if session.practice:
+                    response.attempt += 1
                 else:
-                    response.previous_answers = answer
+                    response.answered_on = datetime.datetime.now()
 
             response.save()
 
-        if not next_unanswered:
-            return HttpResponseRedirect(reverse("quiz-end", args=[session.id]))
-#        else:
-#            return HttpResponseRedirect(reverse("quiz-question", args=[next_unanswered.id]))
+        # automatically move to the next question if not practicing
+        if not session.practice:
+            if not next_unanswered:
+                return HttpResponseRedirect(reverse("quiz-end", args=[session.id]))
+            else:
+                return HttpResponseRedirect(reverse("quiz-question", args=[next_unanswered.id]))
     
     return render_to_response(template_name, locals(),
         context_instance=RequestContext(request))

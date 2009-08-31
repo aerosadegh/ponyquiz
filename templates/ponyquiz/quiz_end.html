@@ -45,8 +45,8 @@
         {% if response.score %}<strong>{{ response.answer }}</strong>
         {% else %}<strike>{{ response.answer }}</strike>{% endif %}
         <ul>
-        {% for correct in response.get_correct_answers %}
-            <li>{{ correct.content|safe }} - {{ correct.percent_correct }}</li>
+        {% for possible in response.userpossibleanswer_set.all %}
+            <li>{{ possible.possibleanswer.content|safe }} - {{ possible.point_value }}</li>
         {% endfor %}
         </ul>
     </div>

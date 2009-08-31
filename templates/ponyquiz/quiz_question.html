@@ -35,13 +35,8 @@
 {% endblock %}
 
 {% block content %}
+{% if session.practice %}
 <div id="sidebar">
-    {% if help_notes %}
-    <h3>Help Notes</h3>
-    <div class="help-notes">
-        {{ help_notes }}
-    </div>
-    {% endif %}
     <div class="user-notes">
 
         {% if response.answered_on or response.attempt|gt:1 %}
@@ -63,6 +58,7 @@
         {% endif %}
     </div>
 </div>
+{% endif %}
 <div class="question">
     <h2>{{ question.title }}</h2>
     <h3>Question #{{ idx|add:1 }}:{% if response.answered_on %} Answered {% else %} Attempt {{ response.attempt }}{% endif %}</h3>
@@ -74,7 +70,7 @@
             {% for useranswer in response.userpossibleanswer_set.all %}
             {% with useranswer.possibleanswer as answer %}
             <div class="answer{% ifequal answer.content response.answer %} current-answer{% endifequal %}{% if answer.content|in:previous_answers %} attempted{% endif %}">
-                <input type="radio" name="answer" value="{{ answer.id }}" {% ifequal answer.content response.answer %}checked="checked"{% endifequal %} />{{ answer.content }}
+                <input type="radio" name="answer" value="{{ useranswer.id }}" {% ifequal answer.content response.answer %}checked="checked"{% endifequal %} />{{ answer.content }}
             </div>
             {% endwith %}
             {% endfor %}
