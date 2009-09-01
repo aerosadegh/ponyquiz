@@ -10,7 +10,6 @@ from models import *
 
 def build_sample():
 
-    Question.objects.all().delete()
     
     romanji = [
         ('a', u'&#x3042;'), ('i', u'&#x3044;'), ('u', u'&#x3046;'), ('e', u'&#x3048;'), ('o', u'&#x304A;'),
@@ -31,25 +30,25 @@ def build_sample():
         ('n', u'&#x3093;')
     ]
 
+    quiz,qcreated = Quiz.objects.get_or_create(name="Hiragana", defaults={"description": "Hiragana", "slug": "hiragana"})
     hiragana,created = Module.objects.get_or_create(name="Hiragana", defaults={"description": "Hiragana"})
-    if created:
+    Question.objects.filter(module=hiragana).delete()
+
+    if qcreated or created:
         QuizModule(quiz=quiz, module=hiragana).save()
     for roma, hira in romanji:
         question = Question(
             title=u"Hiragana Recognition",
             content=u"<p>What character is this?:<div class='hiragana'>%s</div></p>"%hira,
-            module=hiragana)
+            module=hiragana,  module_answers=True)
         question.save()
-        for roma2, hira2 in romanji:
-            answer = PossibleAnswer(content=roma2, question=question)
-            if roma == roma2:
-                answer.percent_correct = 1
-            answer.save()
-            print u" - answer %s" % hira2
-        print u"question %s" % hira
+        PossibleAnswer(content=roma, question=question, point_value=1).save()
+        print u" - question %s" % hira
 
 
 def quiz_intro(request, slug, template_name="ponyquiz/quiz_start.html"):
+
+#build_sample()
 
     quiz = Quiz.objects.get(slug=slug)
     topscores = QuizSession.objects.order_by("-total_score")[:10]
@@ -99,6 +98,7 @@ def quiz_intro(request, slug, template_name="ponyquiz/quiz_start.html"):
 
 def quiz_end(request, id, template_name="ponyquiz/quiz_end.html"):
     session = QuizSession.objects.get(id=id)
+
     if not session.ended_on:
         session.ended_on = datetime.datetime.now()
         session.total_score = session.useranswer_set.aggregate(score=Sum("score"))["score"] or 0
@@ -116,7 +116,11 @@ def quiz_end(request, id, template_name="ponyquiz/quiz_end.html"):
 def quiz_question(request, id, template_name="ponyquiz/quiz_question.html"):
 
     # preload all the goodness
-    response = UserAnswer.objects.filter(session__user=request.user).select_related().get(id=id)
+    user = request.user
+    if request.user.is_authenticated():
+        response = UserAnswer.objects.filter(session__user=request.user).select_related().get(id=id)
+    else:
+        response = UserAnswer.objects.filter(session__ip_address=request.META['REMOTE_ADDR']).select_related().get(id=id)
     session = response.session
 
     # get the next and previous questions

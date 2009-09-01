@@ -66,7 +66,6 @@ class Question(models.Model):
     content = models.TextField()
     difficulty = models.PositiveIntegerField(
         null=True, blank=True, help_text="on a scale of: 1-10")
-    point_value = models.IntegerField(default=1)
     module = models.ForeignKey(Module)
     module_answers = models.BooleanField(default=False,
         help_text="Use correct answers for other questions in this module "
@@ -82,9 +81,11 @@ class Question(models.Model):
         retval = list(self.possibleanswer_set.all())
 
         if len(retval) < MAX_CHOICES:
-            retval += PossibleAnswer.objects.filter(
-                question__module=self.module, percent_correct__gt=0
-            ).exclude(content__in=[pa.content for pa in retval])[:MAX_CHOICES - len(retval)]
+            retval += random.sample(
+                PossibleAnswer.objects.filter(
+                    question__module=self.module, point_value__gt=0
+                ).exclude(content__in=[pa.content for pa in retval]),
+                MAX_CHOICES - len(retval))
 
         random.shuffle(retval)
         return retval
@@ -96,8 +97,8 @@ class Question(models.Model):
         else:
             answers = self.possibleanswer_set.all()
             if answers.count() > MAX_CHOICES:
-                retval = list(answers.filter(percent_correct__gt=0)[:MAX_CHOICES])
-                incorrect = list(answers.filter(percent_correct__lte=0))
+                retval = list(answers.filter(point_value__gt=0)[:MAX_CHOICES])
+                incorrect = list(answers.filter(point_value__lte=0))
                 remaining = MAX_CHOICES - len(retval)
                 if remaining > 0:
                     retval += random.sample(incorrect, remaining)
@@ -105,13 +106,6 @@ class Question(models.Model):
                 retval = list(answers)
             random.shuffle(retval)
             return retval
-
-    def correct(self, answer_id):
-        answered = self.possibleanswer_set.filter(userpossibleanswer__id=answer_id)
-        if answered.question == self:
-            return answer.percent_correct * self.point_value
-        else:
-            return 0 # no points if this
 
 #class MultipleChoiceQuestion(Question):
 #
@@ -130,17 +124,14 @@ class PossibleAnswer(models.Model):
 
     question = models.ForeignKey(Question)
     content = models.CharField(max_length=255)
-    percent_correct = models.FloatField(default=0,
-        help_text="Percentage of this questions points that using this answer will reward (-1.0 = -100%; 1.0 = 100%)")
+    point_value = models.FloatField(default=1)
     explaination = models.TextField(blank=True, null=True,
         help_text="an explaination why this answer is or isn't true")
 
     def __unicode__(self):
-        if self.percent_correct >= 1:
+        if self.point_value >= 1:
             retval = "Correct Answer"
-        elif self.percent_correct > 0:
-            retval = "Partially Correct Answer"
-        elif self.percent_correct == 0:
+        elif self.point_value == 0:
             retval = "Incorrect Answer"
         else:
             retval = "Wickedly Placed Incorrect Answer"
@@ -187,8 +178,11 @@ class UserAnswer(models.Model):
     answered_on = models.DateTimeField(null=True)
     attempt = models.IntegerField(default=1)
 
+    def get_all_answered(self):
+        return PossibleAnswer.objects.filter(userpossibleanswer__useranswer=self, userpossibleanswer__chosen=True)
+
     def get_correct_answers(self):
-        return PossibleAnswer.objects.filter(userpossibleanswer__useranswer=self, percent_correct__gt=0).order_by("-percent_correct")
+        return PossibleAnswer.objects.filter(userpossibleanswer__useranswer=self, point_value__gt=0).order_by("-point_value")
 
 def create_answer_set(sender, instance, created, **kwargs):
         if created:
@@ -209,6 +203,5 @@ class UserPossibleAnswer(models.Model):
         if self.possibleanswer.question != self.useranswer.question:
             self.point_value = 0
         else:
-            self.point_value = self.possibleanswer.question.point_value * \
-                self.possibleanswer.percent_correct
+            self.point_value = self.possibleanswer.point_value
         super(UserPossibleAnswer, self).save()

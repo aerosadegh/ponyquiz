@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load compare %}
 
 {% block extrahead %}
 {{ block.super }}
@@ -14,8 +15,18 @@
     }
     .answer {
         padding: 0px 10px;
-        border: 2px solid grey;
+        border-top: 2px solid grey;
         margin-bottom: 4px;
+    }
+    .answers {border:2px solid; border-top: none; width: 100%;}
+    .answers td, .answers th {padding-left: 5px; padding-right: 5px;}
+    .question {}
+    .useranswer {font-weight: bold;}
+    .correct {
+        color: #353;
+    }
+    .incorrect {
+        color: #533;
     }
 </style>
 {% endblock %}
@@ -38,18 +49,22 @@
     </div>
     <a href="{% url quiz-intro session.quiz.slug %}">Restart</a>
 </div>
-<div class="answers">
+<table class="answers">
     {% for response in session.answered %}
-    <div class="answer">
-        {{ response.answered_on|date:"h:i:s a" }}: {{ response.question.content|striptags|safe }}
-        {% if response.score %}<strong>{{ response.answer }}</strong>
-        {% else %}<strike>{{ response.answer }}</strike>{% endif %}
-        <ul>
-        {% for possible in response.userpossibleanswer_set.all %}
-            <li>{{ possible.possibleanswer.content|safe }} - {{ possible.point_value }}</li>
-        {% endfor %}
-        </ul>
-    </div>
+    <tr class="answer">
+        <th colspan="3" class="question">{{ response.answered_on|date:"h:i:s a" }}:
+    <em>{{ response.question.content|striptags|safe }}</em></th></tr>
+    </tr>
+    {% for possible in response.userpossibleanswer_set.all %}
+    <tr class="{% if possible.point_value|gt:0 %}correct{% else %}incorrect{% endif %} {% ifequal possible.possibleanswer.content response.answer %}useranswer{% endifequal %}">
+        <td>{% if possible.chosen %} &rsaquo; {% endif %}</td>
+        <td>{{ possible.possibleanswer.content|safe }} ({{ possible.point_value }} points)</td>
+        <td>{% if possible.chosen %}{% ifequal possible.possibleanswer.question possible.useranswer.question %}
+            {{ possible.possibleanswer.explaination }}
+            {% endifequal %}{% endif %}
+        </td>
+    </tr>
     {% endfor %}
-</div>
+    {% endfor %}
+</table>
 {% endblock %}
