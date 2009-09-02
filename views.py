@@ -45,14 +45,20 @@ def build_sample():
         PossibleAnswer(content=roma, question=question, point_value=1).save()
         print u" - question %s" % hira
 
+def quiz_index(request, template_name="ponyquiz/quiz_index.html"):
+
+    available_quizes = Quiz.objects.all()
+
+    return render_to_response(template_name, locals(),
+        context_instance=RequestContext(request))
 
 def quiz_intro(request, slug, template_name="ponyquiz/quiz_start.html"):
 
 #build_sample()
 
     quiz = Quiz.objects.get(slug=slug)
-    topscores = QuizSession.objects.order_by("-total_score")[:10]
-    total_plays = QuizSession.objects.count()
+    topscores = QuizSession.objects.filter(quiz=quiz).order_by("-total_score")[:10]
+    total_plays = QuizSession.objects.filter(quiz=quiz).count()
 
     # is this user already participating in a quiz?
     open_sessions = QuizSession.objects.filter(
@@ -105,11 +111,10 @@ def quiz_end(request, id, template_name="ponyquiz/quiz_end.html"):
         session.save()
 
     # show congrats/apologize
-    topscores = QuizSession.objects.order_by("-total_score")[:10]
-    rank = QuizSession.objects.filter(total_score__gt=session.total_score or 0).count() + 1
-    total_plays = QuizSession.objects.count()
+    topscores = QuizSession.objects.filter(quiz=session.quiz).order_by("-total_score")[:10]
+    rank = QuizSession.objects.filter(quiz=session.quiz, total_score__gt=session.total_score or 0).count() + 1
+    total_plays = QuizSession.objects.filter(quiz=session.quiz).count()
     
-
     return render_to_response(template_name, locals(),
         context_instance=RequestContext(request))
 
@@ -124,7 +129,7 @@ def quiz_question(request, id, template_name="ponyquiz/quiz_question.html"):
     session = response.session
 
     # get the next and previous questions
-    responses = session.useranswer_set.all()
+    responses = session.useranswer_set.select_related().all()
     for idx, item in enumerate(responses.all()):
         if item.id == response.id:
             break            
@@ -133,16 +138,15 @@ def quiz_question(request, id, template_name="ponyquiz/quiz_question.html"):
     if idx+1 < responses.count():
         next = responses[idx+1]
 
-    unanswered = responses.filter(answered_on__isnull=True)
+    unanswered = responses.select_related().filter(answered_on__isnull=True)
     if unanswered.exclude(id=response.id).count() > 0:
         next_unanswered = unanswered.exclude(id=response.id)[0]
     else:
         next_unanswered = None
-    answered = responses.filter(answered_on__isnull=False)
     question = response.question
-    previous_answers = UserPossibleAnswer.objects.filter(possibleanswer__question=question, chosen=True)
-    quiz_module = QuizModule.objects.get(module__question=question)
-    message = ""
+    previous_answers = UserPossibleAnswer.objects.select_related().filter(
+        possibleanswer__question=question, chosen=True)
+    #quiz_module = QuizModule.objects.get(module__question=question)
     
     if request.method == "POST" and request.POST.get('answer', False):
         

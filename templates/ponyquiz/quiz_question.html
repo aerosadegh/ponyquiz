@@ -11,14 +11,13 @@
     .answer input {margin-right: 10px; }
     .hiragana {
         margin: auto;
-        width: 100px;
         font-size: 70pt;
         border: 3px solid black;
         margin-bottom: 25px;
         text-align: center;
+        white-space: nowrap;
     }
     .question {
-        width: 675px;
         text-align: center;
     }
     .answer.current-answer { font-weight: bold; }
@@ -60,8 +59,8 @@
 </div>
 {% endif %}
 <div class="question">
-    <h2>{{ question.title }}</h2>
-    <h3>Question #{{ idx|add:1 }}:{% if response.answered_on %} Answered {% else %} Attempt {{ response.attempt }}{% endif %}</h3>
+    <h2>{{ question.title|default:question.module.name }}</h2>
+    <h3>Question #{{ idx|add:1 }}:{% if response.answered_on %} Answered {% endif %}</h3>
     {{ question.content|safe }}
 
     <form action="." method="post">
@@ -70,7 +69,8 @@
             {% for useranswer in response.userpossibleanswer_set.all %}
             {% with useranswer.possibleanswer as answer %}
             <div class="answer{% ifequal answer.content response.answer %} current-answer{% endifequal %}{% if answer.content|in:previous_answers %} attempted{% endif %}">
-                <input type="radio" name="answer" value="{{ useranswer.id }}" {% ifequal answer.content response.answer %}checked="checked"{% endifequal %} />{{ answer.content }}
+                <input type="radio" name="answer" value="{{ useranswer.id }}" {% ifequal answer.content response.answer %}checked="checked"{% endifequal %} />
+                <a href="javascript:void()" onclick="$(this).prev().attr('checked', 'checked');$(this).parents('form').get(0).submit()">{{ answer.content }}</a>
             </div>
             {% endwith %}
             {% endfor %}

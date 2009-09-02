@@ -6,5 +6,5 @@ urlpatterns = patterns('',
     url(r'^session/(\d+)/end/', quiz_end, name="quiz-end"),
     url(r'^session/(\d+)/', quiz_question, name="quiz-question"),
     url(r'^([\w\-]+)/', quiz_intro, name="quiz-intro"),
-#    url(r'^/$', quiz_index, name="quiz-index"),
+    url(r'^$', quiz_index, name="quiz-index"),
 )
