@@ -1,0 +1,23 @@
+{% extends "admin/change_form.html" %}
+
+{% block title %}Import Definitions{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="/admin/">home</a> &rsaquo;
+    <a href="/admin/ponyquiz/">ponyquiz</a> &rsaquo;
+    <a href="/admin/ponyquiz/module/">Modules</a>
+</div>
+{% endblock %}
+
+{% block content %}
+<form action="." method="post">
+    <table>
+        {{ form }}
+        <tr>
+            <td></td>
+            <td><input type="submit" value="Import" /></td>
+        </tr>
+    </table>
+</form>
+{% endblock %}

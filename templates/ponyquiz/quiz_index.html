@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block title %}PonyQuiz Index{% endblock %}
+
+{% block content %}
+<ul>{% for quiz in available_quizes %}
+    <li>
+        <a href="{% url quiz-intro quiz.slug %}">{{ quiz.name }}
+            (taken {{ quiz.quizsession_set.count }}
+             time{{ quiz.quizsession_set.count|pluralize }})
+        </a>
+    </li>
+{% endfor %}</ul>
+{% endblock %}
